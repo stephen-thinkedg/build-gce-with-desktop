@@ -1,0 +1,101 @@
+
+
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+   - ./vars/secrets.yml
+   - ./vars/gce_system.yml
+
+  vars:
+     name_of_instance: 'skc-dev-03'
+     secret_key: 'ygA7VINKllP33adHG0GvPoaBAHdmqHopLCyTpMpS'
+     access_key: 'GOOGL2BAMBFAUT3ACBKP'
+     disk_name: 'skc-dev-02-data'
+     
+  
+  tasks:
+    - shell: echo this is a test
+
+    - name: test the secretrs.yml file
+      debug: var="{{ test_secret }}"
+
+    - name: Launch instances
+      gce:
+        instance_names: "{{ name_of_instance }}"
+        machine_type: "{{ machine_type }}"
+        image: "{{ image }}"
+        service_account_email: "{{ service_account_email }}"
+        pem_file: "{{ pem_file }}"
+        project_id: "{{ project_id }}"
+        disk_auto_delete: 'true'
+        persistent_boot_disk: 'true'
+      register: gce
+
+    - name:  lets see what gce returned.
+      debug: msg=" {{ gce }}"
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ item.public_ip }} port=22 delay=10 timeout=60
+      with_items: gce.instance_data
+
+    - name: Add host to groupname
+      add_host: hostname={{ item.public_ip }} groupname=new_instances
+      with_items: gce.instance_data
+
+    # - local_action:
+    #     module: gce_pd
+    #     instance_name: "{{ item.name }}"
+    #     project_id: "{{  project_id }}"
+    #     pem_file: "{{ pem_file }}"
+    #     service_account_email: "{{service_account_email }}"
+    #     zone: "{{ zone }}"
+    #     mode: READ_WRITE
+    #     name: "{{ disk_name }}"
+    #   with_items: gce.instance_data
+
+
+- name: Manage new instances
+  hosts: new_instances
+  connection: ssh
+  sudo: True
+
+  vars:
+    vnc_license: 'CDH3H-72A8J-6TCPB-RA6NA-TJN2A'
+    disk_name: 'google-skc-dev-02-data'
+
+  
+  tasks:
+
+    - name: test vnc license var
+      debug: var="{{ vnc_license }}"
+
+    - name: print the disk_naem
+      debug: var="/dev/disk/by-id/{{ disk_name  }}"
+
+    # - name: creat the data dir if it does not exist
+    #   file: path=/data state=directory mode=0755 owner=root
+    
+    # - name: mount the data disk
+    #   command:  mount /dev/disk/by-id/{{ disk_name }} /data
+
+    - name: install  pandoc to pick up markdown
+      apt:  name=pandoc state=present
+      notify: link markdown
+
+
+
+  handlers:
+
+    - name: link markdown
+      file: src=/usr/bin/pandoc dest=/usr/bin/markdown force=yes  state=link
+
+
+    
+    # - name: link /usr/bin/pandoc to /usr/bin/markdown
+    #   file: src=/usr/bin/pandoc dest=/urs/bin/markdown force=yes  state=link
+    #file: src=/usr/bin/pandoc dest=/urs/bin/markdown force=yes  state=link
+    #shell: cp -d /usr/bin/pandoc  /usr/bin/markdown 

@@ -1,0 +1,179 @@
+
+
+---
+
+- hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars_files:
+   - ./vars/secrets.yml
+   - ./vars/gce_system.yml
+
+  vars:
+     name_of_instance: 'skc-ansible-main'
+     secret_key: 'ygA7VINKllP33adHG0GvPoaBAHdmqHopLCyTpMpS'
+     access_key: 'GOOGL2BAMBFAUT3ACBKP'
+     disk_name: 'skc-dev-02-data'    
+     skc_emacs_file: 'skc-emacs-packages.tar.gz'
+     
+  tasks:
+    - shell: echo this is a test
+
+    - name: test the secretrs.yml file
+      debug: var="{{ test_secret }}"
+
+    - name: pull down the   skc-emacs-packages.tar.gz   from google storage
+      gc_storage:  bucket=skc-emacs-git-mode object={{ skc_emacs_file  }}  dest=/usr/local/src/{{ skc_emacs_file  }} mode=get gs_secret_key={{ secret_key }} gs_access_key={{ access_key }}  
+    
+
+    - name: Launch instances
+      gce:
+        instance_names: "{{ name_of_instance }}"
+        machine_type: "{{ machine_type }}"
+        image: "{{ image }}"
+        service_account_email: "{{ service_account_email }}"
+        pem_file: "{{ pem_file }}"
+        project_id: "{{ project_id }}"
+        disk_auto_delete: 'true'
+        persistent_boot_disk: 'true'
+      register: gce
+
+    - name:  lets see what gce returned.
+      debug: msg=" {{ gce }}"
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ item.public_ip }} port=22 delay=10 timeout=60
+      with_items: gce.instance_data
+
+    - name: Add host to groupname
+      add_host: hostname={{ item.public_ip }} groupname=new_instances
+      with_items: gce.instance_data
+
+
+    # - local_action:
+    #     module: gce_pd
+    #     instance_name: "{{ item.name }}"
+    #     project_id: "{{  project_id }}"
+    #     pem_file: "{{ pem_file }}"
+    #     service_account_email: "{{service_account_email }}"
+    #     zone: "{{ zone }}"
+    #     mode: READ_WRITE
+    #     name: "{{ disk_name }}"
+    #   with_items: gce.instance_data
+
+
+    
+- name: Manage new instances
+  hosts: new_instances
+  connection: ssh
+  sudo: True
+
+  vars:
+    vnc_license: 'CDH3H-72A8J-6TCPB-RA6NA-TJN2A'
+    disk_name: 'google-skc-dev-02-data'
+    skc_emacs_file: 'skc-emacs-packages.tar.gz'
+    
+  
+  tasks:
+
+    - name: test vnc license var
+      debug: var="{{ vnc_license  }}"
+
+    - name: print the disk_naem
+      debug: var="/dev/disk/by-id/{{ disk_name  }}"
+
+    # - name: creat the data dir if it does not exist
+    #   file: path=/data state=directory mode=0755 owner=root
+    
+    # - name: mount the data disk
+    #   command:  mount /dev/disk/by-id/{{ disk_name }} /data    
+
+    - name: do the apt-get update 
+      apt: update_cache=yes
+
+    - name: do the apt-get upgrade
+      apt: upgrade=dist
+
+    - name: install build-essential
+      apt: name=build-essential state=present
+
+    - name: install emacs 24
+      apt: name=emacs24 state=present
+
+    - name: install yaml-mode for emacs
+      apt: name=yaml-mode state=present
+
+    - name: install xfce4
+      apt: name=xfce4 state=present
+
+    - name: install xfce4-goodies
+      apt: name=xfce4-goodies state=present
+
+    - name: copy tar.gz for VNC-5.2.0-Linux-x64-DEB.tar.gz over
+      unarchive: src=/usr/local/src/VNC-5.2.0-Linux-x64-DEB.tar.gz dest=/usr/local/src  owner=root
+
+    - name: install the real vnc server
+      apt: deb=/usr/local/src/VNC-Server-5.2.0-Linux-x64.deb
+
+    - name: copy over the ibmthink.jpg
+      copy: src=/home/stephen/Pictures/ibmthink.jpg dest=/home/stephen/Pictures/ owner=stephen
+
+    - name: install software-properties-common for ansible install
+      apt: name=software-properties-common state=present
+
+    - name: add the ppa:ansible/ansible repo to  sources list.
+      apt_repository: repo=ppa:ansible/ansible state=present
+
+    - name: update the sources list
+      apt: update_cache=yes
+
+    - name: install ansible
+      apt: name=ansible state=present
+
+    - name: applie the real vnc license
+      command: vnclicense -add "{{ vnc_license }}"
+
+    - name: start the vnc serve as stephen
+      command: vncserver :4 -geometry 1345x745
+      become: yes
+      become_user: stephen
+
+    - name: determine the exteranl ip address
+      command:  curl http://icanhazip.com
+      register: exip
+
+    - name: print out the externail ip address
+      debug: msg={{ exip }}
+
+    - name: install firefox web browser
+      apt: name=firefox state=present
+
+    # - name: creat the skc-emacs-packages dir if it does not exist
+    #   file: path=/home/stephen/skc-emacs-packages state=directory mode=0755 owner=stephen
+
+    # - name: copy emacs package git-emacs-master.zip to skc-emacs-packages
+    #   copy: src=/usr/local/src/git-emacs-master.zip dest=/home/stephen/skc-emacs-packages owner=stephen group=stephen mode=0644
+
+    - name: setup skc-emacs-packages
+      unarchive: src=/usr/local/src/{{ skc_emacs_file }} dest=/home/stephen/ owner=stephen group=stephen
+
+    - name: add emacs-goodies-el to pick up mark down mode
+      apt: name=emacs-goodies-el state=present
+  
+    - name: install python-setuptools
+      apt: name=python-setuptools state=present
+
+    - name: install  python-pip
+      apt: name=python-pip state=present
+
+    - name: install  pandoc to pick up markdown
+      apt:  name=pandoc state=present
+      notify: link markdown
+
+
+
+
+  
+
+      
