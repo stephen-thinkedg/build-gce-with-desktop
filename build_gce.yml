@@ -51,16 +51,16 @@
       with_items: gce.instance_data
 
 
-    # - local_action:
-    #     module: gce_pd
-    #     instance_name: "{{ item.name }}"
-    #     project_id: "{{  project_id }}"
-    #     pem_file: "{{ pem_file }}"
-    #     service_account_email: "{{service_account_email }}"
-    #     zone: "{{ zone }}"
-    #     mode: READ_WRITE
-    #     name: "{{ disk_name }}"
-    #   with_items: gce.instance_data
+    - local_action:
+        module: gce_pd
+        instance_name: "{{ item.name }}"
+        project_id: "{{  project_id }}"
+        pem_file: "{{ pem_file }}"
+        service_account_email: "{{service_account_email }}"
+        zone: "{{ zone }}"
+        mode: READ_WRITE
+        name: "{{ disk_name }}"
+      with_items: gce.instance_data
 
 
     
