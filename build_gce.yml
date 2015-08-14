@@ -12,8 +12,8 @@
 
   vars:
      name_of_instance: 'skc-ansible-main'
-     secret_key: 'ygA7VINKllP33adHG0GvPoaBAHdmqHopLCyTpMpS'
-     access_key: 'GOOGL2BAMBFAUT3ACBKP'
+     secret_key: 'xxx'
+     access_key: 'yyy'
      disk_name: 'skc-dev-02-data'    
      skc_emacs_file: 'skc-emacs-packages.tar.gz'
      
